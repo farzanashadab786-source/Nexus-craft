@@ -3,52 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nexuscrafts Crafting</title>
+    <title>Nexuscrafts Stable</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: 'Arial', sans-serif; }
-        #ui-layer { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: white; }
         
-        /* Inventory & Crafting UI */
-        #top-bar { position: absolute; top: 10px; left: 10px; color: white; text-shadow: 2px 2px #000; pointer-events: auto; }
+        /* Stats & Inventory */
+        #hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 5px; }
+        
+        /* Menu */
         #craft-menu { 
-            display: none; position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); width: 300px; height: 200px; 
-            background: rgba(0,0,0,0.8); border: 4px solid #fff; color: white; 
-            padding: 20px; pointer-events: auto; text-align: center;
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 250px; background: rgba(0,0,0,0.9); border: 2px solid gold; padding: 20px; pointer-events: auto; text-align: center;
         }
-        
+
         /* Buttons */
-        .btn { position: absolute; background: rgba(0,0,0,0.6); color: white; border: 2px solid #fff; border-radius: 8px; display: flex; justify-content: center; align-items: center; pointer-events: auto; font-weight: bold; }
-        #craft-btn-open { top: 10px; right: 10px; width: 100px; height: 40px; background: #f39c12; }
-        #jump-btn { bottom: 120px; right: 20px; width: 60px; height: 60px; }
-        #break-btn { bottom: 20px; right: 20px; width: 80px; height: 80px; background: #c0392b; }
-        #place-btn { bottom: 20px; right: 110px; width: 80px; height: 80px; background: #27ae60; }
+        .btn { position: absolute; background: rgba(0,0,0,0.6); color: white; border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; pointer-events: auto; font-weight: bold; font-size: 14px; width: 70px; height: 70px; }
+        #btn-craft { top: 10px; right: 10px; border-radius: 5px; height: 40px; width: 80px; background: orange; }
+        #btn-jump { bottom: 100px; right: 20px; }
+        #btn-dig { bottom: 20px; right: 20px; background: #8b0000; }
+        #btn-place { bottom: 20px; right: 100px; background: #228b22; }
         
-        .recipe-btn { background: #34495e; color: white; border: 1px solid white; padding: 10px; margin: 5px; width: 100%; cursor: pointer; }
-        
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 1px solid white; transform: translate(-50%, -50%); }
+        /* Joystick Area */
+        #joy-shell { position: absolute; bottom: 20px; left: 20px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; pointer-events: auto; }
+        #joy-stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: white; border-radius: 50%; opacity: 0.5; }
+
+        .recipe { width: 100%; margin: 5px 0; padding: 10px; background: #444; color: white; border: none; }
     </style>
 </head>
 <body>
-    <div id="ui-layer">
-        <div id="top-bar">
-            <div>Resources: <span id="res-count">0</span></div>
-            <div>Building Material: <span id="build-type">Grass</span></div>
-        </div>
-        
-        <div id="craft-btn-open" class="btn" onclick="toggleCraft()">CRAFT</div>
-        
-        <div id="craft-menu">
-            <h3>CRAFTING TABLE</h3>
-            <button class="recipe-btn" onclick="craft('Brick', 3)">3 Resources -> 1 Brick</button>
-            <button class="recipe-btn" onclick="craft('Steel', 5)">5 Resources -> 1 Steel</button>
-            <button class="recipe-btn" onclick="toggleCraft()" style="background:red">CLOSE</button>
+
+    <div id="ui">
+        <div id="hud">
+            Items: <span id="count">0</span><br>
+            Using: <span id="mat-name">Grass</span>
         </div>
 
-        <div id="crosshair"></div>
-        <div id="jump-btn" class="btn">JUMP</div>
-        <div id="place-btn" class="btn">PLACE</div>
-        <div id="break-btn" class="btn">DIG</div>
+        <button id="btn-craft" class="btn" onclick="openCraft()">CRAFT</button>
+
+        <div id="craft-menu" id="menu">
+            <h3>CRAFTING</h3>
+            <button class="recipe" onclick="doCraft('Stone', 2)">2 Items -> Stone</button>
+            <button class="recipe" onclick="doCraft('Gold', 5)">5 Items -> Gold</button>
+            <button class="recipe" onclick="openCraft()" style="background:red">CLOSE</button>
+        </div>
+
+        <div id="joy-shell"><div id="joy-stick"></div></div>
+        <div id="btn-jump" class="btn">JUMP</div>
+        <div id="btn-place" class="btn">BUILD</div>
+        <div id="btn-dig" class="btn">DIG</div>
     </div>
 
     <script type="importmap">
@@ -58,112 +62,138 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- ENGINE SETUP ---
+        // --- SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(5, 10, 5);
-        scene.add(light, new THREE.AmbientLight(0x404040));
+        scene.add(light, new THREE.AmbientLight(0x666666));
 
-        // --- GAME DATA ---
-        let resources = 0;
-        let currentBuildMaterial = 'grass';
-        const blocks = [];
-        const drops = [];
-
-        const materials = {
-            grass: new THREE.MeshLambertMaterial({ color: 0x567d46 }),
-            Brick: new THREE.MeshLambertMaterial({ color: 0x964b00 }),
-            Steel: new THREE.MeshLambertMaterial({ color: 0x7f8c8d }),
-            drop: new THREE.MeshLambertMaterial({ color: 0xffff00 })
+        // --- MATERIALS ---
+        const mats = {
+            Grass: new THREE.MeshLambertMaterial({ color: 0x567d46 }),
+            Stone: new THREE.MeshLambertMaterial({ color: 0x808080 }),
+            Gold: new THREE.MeshLambertMaterial({ color: 0xffd700 }),
+            Drop: new THREE.MeshLambertMaterial({ color: 0xffffff })
         };
-
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         const dropGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
 
-        // --- FUNCTIONS ---
-        window.toggleCraft = () => {
-            const menu = document.getElementById('craft-menu');
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        // --- STATE ---
+        let items = 0;
+        let activeMat = 'Grass';
+        const worldBlocks = [];
+        const activeDrops = [];
+
+        // --- UI FUNCTIONS ---
+        window.openCraft = () => {
+            const m = document.getElementById('craft-menu');
+            m.style.display = (m.style.display === 'block') ? 'none' : 'block';
         };
 
-        window.craft = (type, cost) => {
-            if (resources >= cost) {
-                resources -= cost;
-                currentBuildMaterial = type;
-                document.getElementById('res-count').innerText = resources;
-                document.getElementById('build-type').innerText = type;
-                alert("Crafted " + type + "!");
-                toggleCraft();
-            } else {
-                alert("Not enough resources!");
+        window.doCraft = (type, cost) => {
+            if (items >= cost) {
+                items -= cost;
+                activeMat = type;
+                updateHUD();
+                window.openCraft();
             }
         };
 
-        // Create Ground
-        for (let x = -8; x < 8; x++) {
-            for (let z = -8; z < 8; z++) {
-                const b = new THREE.Mesh(boxGeo, materials.grass);
+        function updateHUD() {
+            document.getElementById('count').innerText = items;
+            document.getElementById('mat-name').innerText = activeMat;
+        }
+
+        // --- GENERATE WORLD ---
+        for (let x = -7; x < 7; x++) {
+            for (let z = -7; z < 7; z++) {
+                const b = new THREE.Mesh(boxGeo, mats.Grass);
                 b.position.set(x, 0, z);
                 scene.add(b);
-                blocks.push(b);
+                worldBlocks.push(b);
             }
         }
 
-        // --- INTERACTION ---
-        document.getElementById('break-btn').addEventListener('touchstart', () => {
-            const ray = new THREE.Raycaster();
-            ray.setFromCamera(new THREE.Vector2(0,0), camera);
-            const hits = ray.intersectObjects(blocks);
-            if (hits.length > 0 && hits[0].distance < 4) {
-                const obj = hits[0].object;
-                const d = new THREE.Mesh(dropGeo, materials.drop);
-                d.position.copy(obj.position);
-                scene.add(d);
-                drops.push(d);
-                scene.remove(obj);
-                blocks.splice(blocks.indexOf(obj), 1);
-            }
-        });
-
-        document.getElementById('place-btn').addEventListener('touchstart', () => {
-            const ray = new THREE.Raycaster();
-            ray.setFromCamera(new THREE.Vector2(0,0), camera);
-            const hits = ray.intersectObjects(blocks);
-            if (hits.length > 0 && hits[0].distance < 4) {
-                const b = new THREE.Mesh(boxGeo, materials[currentBuildMaterial]);
-                b.position.copy(hits[0].point).add(hits[0].face.normal).floor().addScalar(0.5);
-                scene.add(b);
-                blocks.push(b);
-            }
-        });
-
-        // --- LOOP ---
+        // --- CONTROLS ---
+        let moveX = 0, moveZ = 0;
         camera.position.set(0, 2, 5);
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            // Auto-rotate camera slightly for mobile "look" feel
-            camera.rotation.y += 0.002; 
 
-            // Item Collection
-            for (let i = drops.length - 1; i >= 0; i--) {
-                drops[i].rotation.y += 0.1;
-                if (drops[i].position.distanceTo(camera.position) < 2) {
-                    scene.remove(drops[i]);
-                    drops.splice(i, 1);
-                    resources++;
-                    document.getElementById('res-count').innerText = resources;
+        // Movement (Joystick)
+        const joy = document.getElementById('joy-shell');
+        joy.addEventListener('touchmove', (e) => {
+            const t = e.touches[0];
+            const r = joy.getBoundingClientRect();
+            moveX = (t.clientX - (r.left + 50)) / 50;
+            moveZ = (t.clientY - (r.top + 50)) / 50;
+        });
+        joy.addEventListener('touchend', () => { moveX = 0; moveZ = 0; });
+
+        // Digging
+        document.getElementById('btn-dig').addEventListener('touchstart', () => {
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            const hits = ray.intersectObjects(worldBlocks);
+            if (hits.length > 0 && hits[0].distance < 4) {
+                const target = hits[0].object;
+                // Create Drop
+                const d = new THREE.Mesh(dropGeo, mats.Drop);
+                d.position.copy(target.position);
+                scene.add(d);
+                activeDrops.push(d);
+                // Remove Block
+                scene.remove(target);
+                worldBlocks.splice(worldBlocks.indexOf(target), 1);
+            }
+        });
+
+        // Building
+        document.getElementById('btn-place').addEventListener('touchstart', () => {
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            const hits = ray.intersectObjects(worldBlocks);
+            if (hits.length > 0 && hits[0].distance < 4) {
+                const b = new THREE.Mesh(boxGeo, mats[activeMat]);
+                const pos = hits[0].point.add(hits[0].face.normal);
+                b.position.set(Math.round(pos.x), Math.round(pos.y), Math.round(pos.z));
+                scene.add(b);
+                worldBlocks.push(b);
+            }
+        });
+
+        // --- GAME LOOP ---
+        function loop() {
+            requestAnimationFrame(loop);
+            
+            // Move Player
+            camera.translateX(moveX * 0.1);
+            camera.translateZ(moveZ * 0.1);
+            camera.position.y = 2; // Keep eyes at 2 blocks high
+
+            // Handle Drops
+            for (let i = activeDrops.length - 1; i >= 0; i--) {
+                activeDrops[i].rotation.y += 0.05;
+                if (activeDrops[i].position.distanceTo(camera.position) < 1.5) {
+                    scene.remove(activeDrops[i]);
+                    activeDrops.splice(i, 1);
+                    items++;
+                    updateHUD();
                 }
             }
             renderer.render(scene, camera);
         }
-        animate();
+        loop();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
